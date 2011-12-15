@@ -37,22 +37,30 @@ int main(int argc, char **argv) {
 	}
 
 	//Initialisation connexion
+	struct sockaddr_in addr_client;
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = port_no;
 	addr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
 	memset(&(addr.sin_zero), '\0', 8);
 
-	if(!bind(sock, (struct sockaddr *)&addr, sizeof(addr))) {
+	if(bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 		printf("Erreur de bind du socket\n");
 		exit(1);
 	}
 
 	//Écoute sur le port serveur l'arrivée de nouveau clients 
 	while (1) {
-		if (listen(sock, 1)) 
-			printf("Nous somme bien dans la boucle");
+		listen(sock, 1); 
+		//if (listen(sock, 1)) 
+		//	printf("Nous somme bien dans la boucle");
 	}
+
+	int id_de_la_nouvelle_socket=accept(sock, (struct sockaddr*)&addr_client, sizeof(addr_client));
+	if(id_de_la_nouvelle_socket==SOCKET_ERROR)
+		printf("\nDesole, je ne peux pas accepter la session TCP du a l'erreur : %d",WSAGetLastError());
+   else
+		printf("\naccept      : OK");
 		
 
 	return 0;
