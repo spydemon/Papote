@@ -14,8 +14,9 @@
 #include "ecriture.h"
 #include "message.h"
 #include "msgsrecu.h"
+#include "reseaux.h"
 
-typedef int SOCKET;
+//typedef int SOCKET;
 #define SOCKET_ERROR -1
 #define HAUTEUR_SAISIE_USER 3 
 #define LARGEUR_LISTE_USER 25 
@@ -23,13 +24,6 @@ typedef int SOCKET;
 #define TAILLE_MAX_MESSAGE 50
 
 int main(int argc, char **argv) {
-	//Initialisation de la socket
-	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock == SOCKET_ERROR) {
-		printf("Erreur de déclaration de la socket\n");
-		exit(1);
-	}
-
 	//Vérification de la saisie du port et de l'adresse id
 	if (argc != 3) {
 		printf("Utilisation : %s <adresse ip> <num port>\n", argv[0]);
@@ -50,22 +44,38 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
+  int i=0;
+  int sockfd;                      // descripteur de socket
+  char str[1024]; 		   //chaine de caractere envoyer au serveur 
+  char buf[1024]; 		   //buffer pour la reception des messages
+  int status;
+  struct sockaddr_in dest;         // structure d'adresse qui contiendra les parametres reseaux du destinataire
+
+  	// creation de la socket
+  	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
 	//Ititialisation connexion
 	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = port_no;
-	addr.sin_addr.s_addr = ip_serveur;
-	memset(&(addr.sin_zero), '\0', 8);
+	dest.sin_family = AF_INET;
+	//dest.sin_port = port_no;
+	//dest.sin_addr.s_addr = ip_serveur;
+	memset(&(dest.sin_zero), '\0', 8);
 
-/**
-	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		printf("Erreur de bind du socket\n");
-		exit(1);
-	}
-**/
+  	// famille d'adresse
+  	dest.sin_family = AF_INET;
 
-	//Connexion au serveur
-	connect (sock, (struct sockaddr *)&addr, sizeof(addr));
+  // adresse IPv4 du destinataire
+  inet_aton(argv[1] , &(dest.sin_addr));
+
+  // port du destinataire
+  dest.sin_port = htons((uint16_t) port_no);
+
+  //connection au receiver
+  connect(sockfd, (struct sockaddr *)&dest, sizeof(struct sockaddr) );
+
+	//1er paquet
+  char *user = "Spydemon";
+  send(sockfd,user,(strlen(user)+1),0 );
 
 	//Initialisation de ncurses
 	WINDOW *stdsrc = initscr();			//Allocation des fonctions utilisées
@@ -100,7 +110,15 @@ int main(int argc, char **argv) {
 	int c;
 	struct Chaine *chaine = msg_init(saisie_user, 50);
 	struct Lmsgs *lmsgs = msgs_init(TAILLE_MAX_MESSAGE, LINES - HAUTEUR_SAISIE_USER - MARGE_HAUTE - 2);
+	
+	//Fork du programme pour surveiller les réceptions
+	int forky = fork();
+	if (forky == 0) {
+		reseaux_veilleReception(forky, &status, &sockfd, buf, liste_msg, lmsgs);
+		return 1;
+	}
 
+	else {
 	//ecriture(saisie_user);
 	while (!fin) {
 		//c = wgetch(saisie_user);
@@ -118,7 +136,7 @@ int main(int argc, char **argv) {
 				break;
 			case '\n':
 				//ecriture(saisie_user);
-				envoi_message(saisie_user, liste_msg, chaine, lmsgs);
+				envoi_message(saisie_user, liste_msg, chaine, lmsgs, sockfd);
 				break;
 		}
 		//Si l'utilisateur marque un carractère lisible, celui-ci sera utilisé pour construire une phrase qui sera envoyée ou traitée comme commande.
@@ -133,9 +151,12 @@ int main(int argc, char **argv) {
 		mvwprintw(liste_user, 2, 2, "%d", c);	
 		wrefresh(liste_user);
 	}
+	endwin();
+	free(chaine);
+	}
 
 	//wprintw(liste_msg, "Un texte");
-	wrefresh(liste_msg);
+	//wrefresh(liste_msg);
 
 	//char ligne[40];
 	//getstr(ligne);
@@ -160,8 +181,6 @@ int main(int argc, char **argv) {
 	**/
 
 	//getch();
-	endwin();
-	free(chaine);
 
 	return 0;
 
